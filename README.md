@@ -1,2 +1,3 @@
 # vampc
-An experimental configuration language written in Rust
+
+An experimental language written in Rust.
