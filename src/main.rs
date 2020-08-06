@@ -55,7 +55,13 @@ struct Scanner {
 
 #[derive(Debug, PartialEq)]
 enum Token {
+  /// Represents a named identifier or keyword.
+  Name(String),
+
+  /// Numeric literal.
   Numeric(String),
+
+  /// Unknown (non-whitespace).
   Unknown(char),
 }
 
@@ -71,6 +77,25 @@ impl Scanner {
     let mut chars = self.input.chars().peekable();
     while let Some(next) = chars.next() {
       let token: Option<Token> = match next {
+        // Identifier or Keywords.
+        'a'..='z' | 'A'..='Z' => {
+          let mut name = String::from("");
+          let mut current = next;
+          loop {
+            name.push(current);
+            let peek = chars.peek();
+            match peek {
+              Some('a'..='z') | Some('A'..='Z') => {
+                current = peek.unwrap().to_owned();
+                chars.next();
+              }
+              _ => break,
+            }
+          }
+          Some(Token::Name(name))
+        }
+
+        // Numerical literals.
         '0'..='9' => {
           let mut number = String::from("");
           let mut current = next;
@@ -99,7 +124,9 @@ impl Scanner {
           }
           Some(Token::Numeric(number))
         }
-        ' ' => None,
+        // Whitespace (Ignore).
+        ' ' | '\n' => None,
+        // Unsupported.
         _ => Some(Token::Unknown(next)),
       };
       if token.is_some() {
@@ -196,6 +223,36 @@ mod tests {
     assert_eq!(Some(&Token::Unknown('.')), scanner.output.get(1));
     assert_eq!(
       Some(&Token::Numeric(String::from("3"))),
+      scanner.output.get(2)
+    );
+  }
+
+  #[test]
+  fn test_scan_name() {
+    let mut scanner = Scanner::new("foo".to_string());
+    scanner.scan();
+    assert_eq!(1, scanner.output.len());
+    assert_eq!(
+      Some(&Token::Name(String::from("foo"))),
+      scanner.output.first()
+    );
+  }
+
+  #[test]
+  fn test_scan_multiple_names() {
+    let mut scanner = Scanner::new("foo bar baz".to_string());
+    scanner.scan();
+    assert_eq!(3, scanner.output.len());
+    assert_eq!(
+      Some(&Token::Name(String::from("foo"))),
+      scanner.output.get(0)
+    );
+    assert_eq!(
+      Some(&Token::Name(String::from("bar"))),
+      scanner.output.get(1)
+    );
+    assert_eq!(
+      Some(&Token::Name(String::from("baz"))),
       scanner.output.get(2)
     );
   }
