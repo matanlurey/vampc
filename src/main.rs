@@ -55,7 +55,7 @@ struct Scanner {
 
 #[derive(Debug, PartialEq)]
 enum Token {
-  Number(f64),
+  Numeric(String),
   Unknown(char),
 }
 
@@ -69,29 +69,38 @@ impl Scanner {
 
   fn scan(&mut self) {
     let mut chars = self.input.chars().peekable();
-    while let Some(char) = chars.next() {
-      let token: Option<Token> = match char {
+    while let Some(next) = chars.next() {
+      let token: Option<Token> = match next {
         '0'..='9' => {
-          let mut number = 0.0;
-          let mut current = char;
+          let mut number = String::from("");
+          let mut current = next;
+          let mut is_float = false;
           loop {
-            number *= 10.0;
-            number += ((current as u8) - b'0') as f64;
-            // TODO: Support a single decimal point (for floats).
+            number.push(current);
             // TODO: Support numerical seperators (i.e. `_`).
             // TODO: Support different radix encodings (binary, hex).
-            match chars.peek() {
-              Some(&next) if '0' <= next && next <= '9' => {
-                current = next;
+            let peek = chars.peek();
+            match peek {
+              Some('0'..='9') => {
+                current = peek.unwrap().to_owned();
                 chars.next();
+              }
+              Some('.') => {
+                if is_float {
+                  break;
+                } else {
+                  current = peek.unwrap().to_owned();
+                  chars.next();
+                  is_float = true;
+                }
               }
               _ => break,
             }
           }
-          Some(Token::Number(number))
+          Some(Token::Numeric(number))
         }
         ' ' => None,
-        _ => Some(Token::Unknown(char)),
+        _ => Some(Token::Unknown(next)),
       };
       if token.is_some() {
         self.output.push(token.unwrap());
@@ -105,28 +114,89 @@ mod tests {
   use super::*;
 
   #[test]
-  fn test_scan_0() {
+  fn test_scan_int_0() {
     let mut scanner = Scanner::new("0".to_string());
     scanner.scan();
     assert_eq!(1, scanner.output.len());
-    assert_eq!(Some(&Token::Number(0.0)), scanner.output.first());
+    assert_eq!(
+      Some(&Token::Numeric(String::from("0"))),
+      scanner.output.first()
+    );
   }
 
   #[test]
-  fn test_scan_100() {
+  fn test_scan_int_100() {
     let mut scanner = Scanner::new("100".to_string());
     scanner.scan();
     assert_eq!(1, scanner.output.len());
-    assert_eq!(Some(&Token::Number(100.0)), scanner.output.first());
+    assert_eq!(
+      Some(&Token::Numeric(String::from("100"))),
+      scanner.output.first()
+    );
   }
 
   #[test]
-  fn test_scan_num_unknown_num() {
-    let mut scanner = Scanner::new("1 22 333".to_string());
+  fn test_scan_multiple_ints() {
+    let mut scanner = Scanner::new("10 25 303".to_string());
     scanner.scan();
     assert_eq!(3, scanner.output.len());
-    assert_eq!(Some(&Token::Number(1.0)), scanner.output.get(0));
-    assert_eq!(Some(&Token::Number(22.0)), scanner.output.get(1));
-    assert_eq!(Some(&Token::Number(333.0)), scanner.output.get(2));
+    assert_eq!(
+      Some(&Token::Numeric(String::from("10"))),
+      scanner.output.get(0)
+    );
+    assert_eq!(
+      Some(&Token::Numeric(String::from("25"))),
+      scanner.output.get(1)
+    );
+    assert_eq!(
+      Some(&Token::Numeric(String::from("303"))),
+      scanner.output.get(2)
+    );
+  }
+
+  #[test]
+  fn test_scan_float() {
+    let mut scanner = Scanner::new("3.14".to_string());
+    scanner.scan();
+    assert_eq!(1, scanner.output.len());
+    assert_eq!(
+      Some(&Token::Numeric(String::from("3.14"))),
+      scanner.output.first()
+    );
+  }
+
+  #[test]
+  fn test_scan_multiple_floats() {
+    let mut scanner = Scanner::new("1.23 2.50 3.03".to_string());
+    scanner.scan();
+    assert_eq!(3, scanner.output.len());
+    assert_eq!(
+      Some(&Token::Numeric(String::from("1.23"))),
+      scanner.output.get(0)
+    );
+    assert_eq!(
+      Some(&Token::Numeric(String::from("2.50"))),
+      scanner.output.get(1)
+    );
+    assert_eq!(
+      Some(&Token::Numeric(String::from("3.03"))),
+      scanner.output.get(2)
+    );
+  }
+
+  #[test]
+  fn test_scan_invalid_float() {
+    let mut scanner = Scanner::new("1.2.3".to_string());
+    scanner.scan();
+    assert_eq!(3, scanner.output.len());
+    assert_eq!(
+      Some(&Token::Numeric(String::from("1.2"))),
+      scanner.output.get(0)
+    );
+    assert_eq!(Some(&Token::Unknown('.')), scanner.output.get(1));
+    assert_eq!(
+      Some(&Token::Numeric(String::from("3"))),
+      scanner.output.get(2)
+    );
   }
 }
