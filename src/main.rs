@@ -55,14 +55,20 @@ struct Scanner {
 
 #[derive(Debug, PartialEq)]
 enum Token {
+  /// Represents a single-line comment.
+  Comment(String),
+
   /// Represents a named identifier or keyword.
   Name(String),
 
   /// Numeric literal.
   Numeric(String),
 
-  /// Represents a pairing of symbols
+  /// Represents a pairing of symbols.
   Pair(PairSymbol, PairType),
+
+  /// Represents a string literal.
+  String(String),
 
   /// Unknown (non-whitespace).
   Unknown(char),
@@ -146,11 +152,47 @@ impl Scanner {
           Some(Token::Numeric(number))
         }
 
+        // String literals.
+        '\'' => {
+          let mut literal = String::from("");
+          loop {
+            let peek = chars.next();
+            match peek {
+              Some('\'') => {
+                chars.next();
+                break;
+              }
+              Some('\n') | None => break,
+              _ => {
+                literal.push(peek.unwrap().to_owned());
+              }
+            }
+          }
+          Some(Token::String(literal))
+        }
+
         // Pairings.
         '(' => Some(Token::Pair(PairSymbol::Parentheses, PairType::Open)),
         ')' => Some(Token::Pair(PairSymbol::Parentheses, PairType::Close)),
         '{' => Some(Token::Pair(PairSymbol::CurlyBracket, PairType::Open)),
         '}' => Some(Token::Pair(PairSymbol::CurlyBracket, PairType::Close)),
+
+        // Comments.
+        '/' => match chars.peek() {
+          Some('/') => {
+            chars.next();
+            let mut comment = String::from("");
+            loop {
+              let peek = chars.next();
+              match peek {
+                Some('\n') | None => break,
+                _ => comment.push(peek.unwrap().to_owned()),
+              }
+            }
+            Some(Token::Comment(comment))
+          }
+          _ => Some(Token::Unknown(next)),
+        },
 
         // Whitespace (Ignore).
         ' ' | '\n' => None,
@@ -249,7 +291,7 @@ mod tests {
   }
 
   #[test]
-  fn test_parentheses() {
+  fn test_scan_parentheses() {
     assert_tokens(
       "foo(bar)",
       &[
@@ -262,7 +304,7 @@ mod tests {
   }
 
   #[test]
-  fn test_curlies() {
+  fn test_scan_curlies() {
     assert_tokens(
       "class A {}",
       &[
@@ -270,6 +312,44 @@ mod tests {
         Token::Name(String::from("A")),
         Token::Pair(PairSymbol::CurlyBracket, PairType::Open),
         Token::Pair(PairSymbol::CurlyBracket, PairType::Close),
+      ],
+    );
+  }
+
+  #[test]
+  fn test_scan_string() {
+    assert_tokens("'foo'", &[Token::String(String::from("foo"))]);
+  }
+
+  #[test]
+  fn test_scan_string_no_terminator() {
+    assert_tokens("'foo", &[Token::String(String::from("foo"))]);
+  }
+
+  #[test]
+  fn test_scan_string_line_terminator() {
+    assert_tokens(
+      "'foo\nbar'",
+      &[
+        Token::String(String::from("foo")),
+        Token::Name(String::from("bar")),
+        Token::String(String::from("")),
+      ],
+    );
+  }
+
+  #[test]
+  fn test_comment() {
+    assert_tokens("// Hello", &[Token::Comment(String::from(" Hello"))])
+  }
+
+  #[test]
+  fn test_comment_line_terminator() {
+    assert_tokens(
+      "// Foo\nbar",
+      &[
+        Token::Comment(String::from(" Foo")),
+        Token::Name(String::from("bar")),
       ],
     );
   }
