@@ -9,6 +9,8 @@ pub struct Scanner {
   pub output: Vec<Token>,
 }
 
+// TODO: Refactor into a struct that retains offset information for debugging.
+// TODO: Add recovery / error tokens.
 #[derive(Debug, PartialEq)]
 pub enum Token {
   /// Represents a single-line comment.
