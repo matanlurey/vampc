@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::iter;
 
 /// Entrypoint into the compiler/interpreter/virtual machine, what have it.
 ///
@@ -105,71 +106,13 @@ impl Scanner {
     while let Some(next) = chars.next() {
       let token: Option<Token> = match next {
         // Identifier or Keywords.
-        'a'..='z' | 'A'..='Z' => {
-          let mut name = String::from("");
-          let mut current = next;
-          loop {
-            name.push(current);
-            let peek = chars.peek();
-            match peek {
-              Some('a'..='z') | Some('A'..='Z') => {
-                current = peek.unwrap().to_owned();
-                chars.next();
-              }
-              _ => break,
-            }
-          }
-          Some(Token::Name(name))
-        }
+        'a'..='z' | 'A'..='Z' => Scanner::scan_name(&mut chars, next),
 
         // Numerical literals.
-        '0'..='9' => {
-          let mut number = String::from("");
-          let mut current = next;
-          let mut is_float = false;
-          loop {
-            number.push(current);
-            // TODO: Support numerical seperators (i.e. `_`).
-            // TODO: Support different radix encodings (binary, hex).
-            let peek = chars.peek();
-            match peek {
-              Some('0'..='9') => {
-                current = peek.unwrap().to_owned();
-                chars.next();
-              }
-              Some('.') => {
-                if is_float {
-                  break;
-                } else {
-                  current = peek.unwrap().to_owned();
-                  chars.next();
-                  is_float = true;
-                }
-              }
-              _ => break,
-            }
-          }
-          Some(Token::Numeric(number))
-        }
+        '0'..='9' => Scanner::scan_number(&mut chars, next),
 
         // String literals.
-        '\'' => {
-          let mut literal = String::from("");
-          loop {
-            let peek = chars.next();
-            match peek {
-              Some('\'') => {
-                chars.next();
-                break;
-              }
-              Some('\n') | None => break,
-              _ => {
-                literal.push(peek.unwrap().to_owned());
-              }
-            }
-          }
-          Some(Token::String(literal))
-        }
+        '\'' => Scanner::scan_string(&mut chars),
 
         // Pairings.
         '(' => Some(Token::Pair(PairSymbol::Parentheses, PairType::Open)),
@@ -178,21 +121,7 @@ impl Scanner {
         '}' => Some(Token::Pair(PairSymbol::CurlyBracket, PairType::Close)),
 
         // Comments.
-        '/' => match chars.peek() {
-          Some('/') => {
-            chars.next();
-            let mut comment = String::from("");
-            loop {
-              let peek = chars.next();
-              match peek {
-                Some('\n') | None => break,
-                _ => comment.push(peek.unwrap().to_owned()),
-              }
-            }
-            Some(Token::Comment(comment))
-          }
-          _ => Some(Token::Unknown(next)),
-        },
+        '/' => Scanner::scan_comment(&mut chars, next),
 
         // Whitespace (Ignore).
         ' ' | '\n' => None,
@@ -204,6 +133,99 @@ impl Scanner {
         self.output.push(token.unwrap());
       }
     }
+  }
+
+  fn scan_comment<T: Iterator<Item = char>>(
+    chars: &mut iter::Peekable<T>,
+    next: char,
+  ) -> Option<Token> {
+    match chars.peek() {
+      Some('/') => {
+        chars.next();
+        let mut comment = String::from("");
+        loop {
+          let peek = chars.next();
+          match peek {
+            Some('\n') | None => break,
+            _ => comment.push(peek.unwrap().to_owned()),
+          }
+        }
+        Some(Token::Comment(comment))
+      }
+      _ => Some(Token::Unknown(next)),
+    }
+  }
+
+  fn scan_name<T: Iterator<Item = char>>(
+    chars: &mut iter::Peekable<T>,
+    next: char,
+  ) -> Option<Token> {
+    let mut name = String::from("");
+    let mut current = next;
+    loop {
+      name.push(current);
+      let peek = chars.peek();
+      match peek {
+        Some('a'..='z') | Some('A'..='Z') => {
+          current = peek.unwrap().to_owned();
+          chars.next();
+        }
+        _ => break,
+      }
+    }
+    Some(Token::Name(name))
+  }
+
+  fn scan_number<T: Iterator<Item = char>>(
+    chars: &mut iter::Peekable<T>,
+    next: char,
+  ) -> Option<Token> {
+    let mut number = String::from("");
+    let mut current = next;
+    let mut is_float = false;
+    loop {
+      number.push(current);
+      // TODO: Support numerical seperators (i.e. `_`).
+      // TODO: Support different radix encodings (binary, hex).
+      let peek = chars.peek();
+      match peek {
+        Some('0'..='9') => {
+          current = peek.unwrap().to_owned();
+          chars.next();
+        }
+        Some('.') => {
+          if is_float {
+            break;
+          } else {
+            current = peek.unwrap().to_owned();
+            chars.next();
+            is_float = true;
+          }
+        }
+        _ => break,
+      }
+    }
+    Some(Token::Numeric(number))
+  }
+
+  fn scan_string<T: Iterator<Item = char>>(
+    chars: &mut iter::Peekable<T>,
+  ) -> Option<Token> {
+    let mut literal = String::from("");
+    loop {
+      let peek = chars.next();
+      match peek {
+        Some('\'') => {
+          chars.next();
+          break;
+        }
+        Some('\n') | None => break,
+        _ => {
+          literal.push(peek.unwrap().to_owned());
+        }
+      }
+    }
+    Some(Token::String(literal))
   }
 }
 
