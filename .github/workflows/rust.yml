@@ -20,6 +20,7 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt, clippy
+
       - name: Check
         uses: actions-rs/cargo@v1
         with:

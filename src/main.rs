@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 
+mod parser;
 mod scanner;
 
 /// Entrypoint into the compiler/interpreter/virtual machine, what have it.
