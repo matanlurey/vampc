@@ -22,6 +22,9 @@ pub enum Token {
   /// Numeric literal.
   Numeric(String),
 
+  /// Operators.
+  Operator(OperatorSymbol),
+
   /// Represents a pairing of symbols.
   Pair(PairSymbol, PairType),
 
@@ -30,6 +33,14 @@ pub enum Token {
 
   /// Unknown (non-whitespace).
   Unknown(char),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum OperatorSymbol {
+  Addition,
+  Assignment,
+  Equality,
+  Subtraction,
 }
 
 #[derive(Debug, PartialEq)]
@@ -70,6 +81,17 @@ impl Scanner {
 
         // String literals.
         '\'' => Scanner::scan_string(&mut chars),
+
+        // Operators
+        '+' => Some(Token::Operator(OperatorSymbol::Addition)),
+        '-' => Some(Token::Operator(OperatorSymbol::Subtraction)),
+        '=' => match chars.peek() {
+          Some('=') => {
+            chars.next();
+            Some(Token::Operator(OperatorSymbol::Equality))
+          }
+          _ => Some(Token::Operator(OperatorSymbol::Assignment)),
+        },
 
         // Pairings.
         '(' => Some(Token::Pair(PairSymbol::Parentheses, PairType::Open)),
@@ -316,12 +338,12 @@ mod tests {
   }
 
   #[test]
-  fn test_comment() {
+  fn test_scan_comment() {
     assert_tokens("// Hello", &[Token::Comment(String::from(" Hello"))])
   }
 
   #[test]
-  fn test_comment_line_terminator() {
+  fn test_scan_comment_line_terminator() {
     assert_tokens(
       "// Foo\nbar",
       &[
@@ -329,5 +351,54 @@ mod tests {
         Token::Name(String::from("bar")),
       ],
     );
+  }
+
+  #[test]
+  fn test_scan_addition() {
+    assert_tokens(
+      "1 + 2",
+      &[
+        Token::Numeric(String::from("1")),
+        Token::Operator(OperatorSymbol::Addition),
+        Token::Numeric(String::from("2")),
+      ],
+    )
+  }
+
+  #[test]
+  fn test_scan_subtraction() {
+    assert_tokens(
+      "1 - 2",
+      &[
+        Token::Numeric(String::from("1")),
+        Token::Operator(OperatorSymbol::Subtraction),
+        Token::Numeric(String::from("2")),
+      ],
+    )
+  }
+
+  #[test]
+  fn test_scan_equality() {
+    assert_tokens(
+      "1 == 2",
+      &[
+        Token::Numeric(String::from("1")),
+        Token::Operator(OperatorSymbol::Equality),
+        Token::Numeric(String::from("2")),
+      ],
+    )
+  }
+
+  #[test]
+  fn test_scan_assignment() {
+    assert_tokens(
+      "let x = 1",
+      &[
+        Token::Name(String::from("let")),
+        Token::Name(String::from("x")),
+        Token::Operator(OperatorSymbol::Assignment),
+        Token::Numeric(String::from("1")),
+      ],
+    )
   }
 }
