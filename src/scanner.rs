@@ -16,8 +16,11 @@ pub enum Token {
   /// Represents a single-line comment.
   Comment(String),
 
-  /// Represents a named identifier or keyword.
-  Name(String),
+  /// Represents a named identifier.
+  Identifier(String),
+
+  /// Represents a reserved word or keyword.
+  Keyword(Keyword),
 
   /// Numeric literal.
   Numeric(String),
@@ -33,6 +36,12 @@ pub enum Token {
 
   /// Unknown (non-whitespace).
   Unknown(char),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Keyword {
+  Func,
+  Let,
 }
 
 #[derive(Debug, PartialEq)]
@@ -74,7 +83,9 @@ impl Scanner {
     while let Some(next) = chars.next() {
       let token: Option<Token> = match next {
         // Identifier or Keywords.
-        'a'..='z' | 'A'..='Z' => Scanner::scan_name(&mut chars, next),
+        'a'..='z' | 'A'..='Z' => {
+          Scanner::scan_keyword_or_identifier(&mut chars, next)
+        }
 
         // Numerical literals.
         '0'..='9' => Scanner::scan_number(&mut chars, next),
@@ -135,7 +146,7 @@ impl Scanner {
     }
   }
 
-  fn scan_name<T: Iterator<Item = char>>(
+  fn scan_keyword_or_identifier<T: Iterator<Item = char>>(
     chars: &mut iter::Peekable<T>,
     next: char,
   ) -> Option<Token> {
@@ -152,7 +163,11 @@ impl Scanner {
         _ => break,
       }
     }
-    Some(Token::Name(name))
+    match name.as_ref() {
+      "func" => Some(Token::Keyword(Keyword::Func)),
+      "let" => Some(Token::Keyword(Keyword::Let)),
+      _ => Some(Token::Identifier(name)),
+    }
   }
 
   fn scan_number<T: Iterator<Item = char>>(
@@ -273,18 +288,18 @@ mod tests {
   }
 
   #[test]
-  fn test_scan_name() {
-    assert_tokens("foo", &[Token::Name(String::from("foo"))]);
+  fn test_scan_identifier() {
+    assert_tokens("foo", &[Token::Identifier(String::from("foo"))]);
   }
 
   #[test]
-  fn test_scan_multiple_names() {
+  fn test_scan_multiple_identifiers() {
     assert_tokens(
       "foo bar baz",
       &[
-        Token::Name(String::from("foo")),
-        Token::Name(String::from("bar")),
-        Token::Name(String::from("baz")),
+        Token::Identifier(String::from("foo")),
+        Token::Identifier(String::from("bar")),
+        Token::Identifier(String::from("baz")),
       ],
     );
   }
@@ -294,9 +309,9 @@ mod tests {
     assert_tokens(
       "foo(bar)",
       &[
-        Token::Name(String::from("foo")),
+        Token::Identifier(String::from("foo")),
         Token::Pair(PairSymbol::Parentheses, PairType::Open),
-        Token::Name(String::from("bar")),
+        Token::Identifier(String::from("bar")),
         Token::Pair(PairSymbol::Parentheses, PairType::Close),
       ],
     );
@@ -305,10 +320,10 @@ mod tests {
   #[test]
   fn test_scan_curlies() {
     assert_tokens(
-      "class A {}",
+      "func A {}",
       &[
-        Token::Name(String::from("class")),
-        Token::Name(String::from("A")),
+        Token::Keyword(Keyword::Func),
+        Token::Identifier(String::from("A")),
         Token::Pair(PairSymbol::CurlyBracket, PairType::Open),
         Token::Pair(PairSymbol::CurlyBracket, PairType::Close),
       ],
@@ -331,7 +346,7 @@ mod tests {
       "'foo\nbar'",
       &[
         Token::String(String::from("foo")),
-        Token::Name(String::from("bar")),
+        Token::Identifier(String::from("bar")),
         Token::String(String::from("")),
       ],
     );
@@ -348,7 +363,7 @@ mod tests {
       "// Foo\nbar",
       &[
         Token::Comment(String::from(" Foo")),
-        Token::Name(String::from("bar")),
+        Token::Identifier(String::from("bar")),
       ],
     );
   }
@@ -394,8 +409,8 @@ mod tests {
     assert_tokens(
       "let x = 1",
       &[
-        Token::Name(String::from("let")),
-        Token::Name(String::from("x")),
+        Token::Keyword(Keyword::Let),
+        Token::Identifier(String::from("x")),
         Token::Operator(OperatorSymbol::Assignment),
         Token::Numeric(String::from("1")),
       ],

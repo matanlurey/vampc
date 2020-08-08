@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 
+#[allow(dead_code)]
 mod parser;
 mod scanner;
 

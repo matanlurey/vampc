@@ -1,3 +1,4 @@
+use scanner::Keyword;
 use scanner::Token;
 use std::iter;
 
@@ -52,6 +53,7 @@ pub enum BinaryOperator {
   Subtraction,
 }
 
+// TODO: Add helper methods to make parsing tolerable.
 impl Parser {
   pub fn new(input: Vec<Token>) -> Parser {
     Parser {
@@ -67,8 +69,10 @@ impl Parser {
         Token::Comment(comment) => Some(Declaration::Comment {
           text: Parser::parse_comment_contents(comment, &mut tokens),
         }),
-        Token::Name(name) => match name.as_ref() {
-          "func" => Some(Parser::parse_function_declaration(&mut tokens)),
+        Token::Keyword(keyword) => match keyword {
+          Keyword::Func => {
+            Some(Parser::parse_function_declaration(&mut tokens))
+          }
           _ => panic!("Unexpected"),
         },
         _ => panic!("Unexpected"),
@@ -95,14 +99,26 @@ impl Parser {
   fn parse_function_declaration<'a, T: Iterator<Item = &'a Token>>(
     tokens: &mut iter::Peekable<T>,
   ) -> Declaration {
-    Declaration::Function {
-      name: String::from(""),
-      body: Vec::new(),
+    if let Some(Token::Identifier(name)) = tokens.peek() {
+      let mut statements = Vec::<Statement>::new();
+      while let Some(s) = Parser::parse_statement() {
+        statements.push(s);
+      }
+      Declaration::Function {
+        name: name.to_string(),
+        body: statements,
+      }
+    } else {
+      panic!("Expected Identifier");
     }
   }
 
   fn parse_statement() -> Option<Statement> {
-    None
+    if let Some(expression) = Parser::parse_expression() {
+      Some(Statement::Expression { expression })
+    } else {
+      None
+    }
   }
 
   fn parse_expression() -> Option<Expression> {
@@ -141,4 +157,7 @@ mod tests {
       }],
     );
   }
+
+  #[test]
+  fn test_function_declaration() {}
 }
