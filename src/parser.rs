@@ -1,4 +1,5 @@
 use scanner::Token;
+use std::iter;
 
 /// Represents an architecture for parsing tokens into an AST (tree).
 pub struct Parser {
@@ -9,6 +10,7 @@ pub struct Parser {
 
 /// Known top-level declarations.
 pub enum Declaration {
+  Comment { text: String },
   Function { name: String, body: Vec<Statement> },
 }
 
@@ -54,5 +56,34 @@ impl Parser {
     }
   }
 
-  pub fn parse(&mut self) {}
+  pub fn parse(&mut self) {
+    let mut tokens = self.input.iter().peekable();
+    while let Some(next) = tokens.next() {
+      let declaration: Option<Declaration> = match next {
+        Token::Comment(comment) => {
+          let text = Parser::parse_comment_contents(&mut tokens);
+          Some(Declaration::Comment { text })
+        }
+        _ => panic!("Unexpected"),
+      };
+    }
+  }
+
+  fn parse_comment_contents<T: Iterator<Item = Token>>(
+    tokens: &mut iter::Peekable<T>,
+  ) -> String {
+    String::from("")
+  }
+
+  fn parse_declaration() -> Option<Declaration> {
+    None
+  }
+
+  fn parse_statement() -> Option<Statement> {
+    None
+  }
+
+  fn parse_expression() -> Option<Expression> {
+    None
+  }
 }
