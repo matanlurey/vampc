@@ -1,404 +1,156 @@
-use std::iter;
-
-/// Represents an architecture for parsing text into symbols (tokens).
-pub struct Scanner {
-  /// Being parsed.
-  pub input: String,
-
-  /// Token output.
-  pub output: Vec<Token>,
+/// Handles source code being scanned into lexigraphical symbols (tokens).
+///
+/// Each token includes offset and raw (string) contents for parsing/debugging.
+pub fn scan(input: String) -> Vec<Span> {
+  let mut spans = Vec::<Span>::new();
+  let mut chars = input.chars().peekable();
+  let mut offset: usize = 0;
+  while let Some(next) = chars.next() {
+    let mut contents: String = next.to_string();
+    let mut kind = Token::Unknown;
+    match next {
+      // Possible comment.
+      '/' => {
+        if let Some('/') = chars.peek() {
+          contents = String::from("//");
+          kind = Token::Comment;
+          chars.next();
+          loop {
+            match chars.next() {
+              Some('\n') | None => break,
+              Some(other) => contents.push(other),
+            }
+          }
+        }
+      }
+      // Whitespace.
+      // Do nothing (skip this token as its not significant).
+      ' ' | '\n' | '\t' => {
+        offset += 1;
+        continue;
+      }
+      // Unknown.
+      // Do nothing (will add an unknown token to output).
+      _ => {}
+    }
+    spans.push(Span {
+      offset,
+      contents: contents.to_owned(),
+      kind,
+    });
+    offset += contents.len();
+  }
+  spans
 }
 
-// TODO: Refactor into a struct that retains offset information for debugging.
-// TODO: Add recovery / error tokens.
+/// A span of source text.
+#[derive(Debug, PartialEq)]
+pub struct Span {
+  /// Starting offset of the text.
+  offset: usize,
+  /// Contents of the text.
+  contents: String,
+  /// Type of token interpreted.
+  kind: Token,
+}
+
+/// A recognized kind of source span during scanning.
 #[derive(Debug, PartialEq)]
 pub enum Token {
-  /// Represents a single-line comment.
-  Comment(String),
-
-  /// Represents a named identifier or keyword.
-  Name(String),
-
-  /// Numeric literal.
-  Numeric(String),
-
-  /// Operators.
-  Operator(OperatorSymbol),
-
-  /// Represents a pairing of symbols.
-  Pair(PairSymbol, PairType),
-
-  /// Represents a string literal.
-  String(String),
-
-  /// Unknown (non-whitespace).
-  Unknown(char),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum OperatorSymbol {
-  Addition,
-  Assignment,
-  Equality,
-  Subtraction,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum PairSymbol {
-  /// `{` or `}`.
-  CurlyBracket,
-
-  /// `(` or `)`.
-  Parentheses,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum PairType {
-  /// `{` or `(`.
-  Open,
-
-  /// `}` or `)`.
-  Close,
-}
-
-impl Scanner {
-  pub fn new(input: String) -> Scanner {
-    Scanner {
-      input,
-      output: Vec::new(),
-    }
-  }
-
-  pub fn scan(&mut self) {
-    let mut chars = self.input.chars().peekable();
-    while let Some(next) = chars.next() {
-      let token: Option<Token> = match next {
-        // Identifier or Keywords.
-        'a'..='z' | 'A'..='Z' => Scanner::scan_name(&mut chars, next),
-
-        // Numerical literals.
-        '0'..='9' => Scanner::scan_number(&mut chars, next),
-
-        // String literals.
-        '\'' => Scanner::scan_string(&mut chars),
-
-        // Operators
-        '+' => Some(Token::Operator(OperatorSymbol::Addition)),
-        '-' => Some(Token::Operator(OperatorSymbol::Subtraction)),
-        '=' => match chars.peek() {
-          Some('=') => {
-            chars.next();
-            Some(Token::Operator(OperatorSymbol::Equality))
-          }
-          _ => Some(Token::Operator(OperatorSymbol::Assignment)),
-        },
-
-        // Pairings.
-        '(' => Some(Token::Pair(PairSymbol::Parentheses, PairType::Open)),
-        ')' => Some(Token::Pair(PairSymbol::Parentheses, PairType::Close)),
-        '{' => Some(Token::Pair(PairSymbol::CurlyBracket, PairType::Open)),
-        '}' => Some(Token::Pair(PairSymbol::CurlyBracket, PairType::Close)),
-
-        // Comments.
-        '/' => Scanner::scan_comment(&mut chars, next),
-
-        // Whitespace (Ignore).
-        ' ' | '\n' => None,
-
-        // Unsupported.
-        _ => Some(Token::Unknown(next)),
-      };
-      if let Some(token) = token {
-        self.output.push(token);
-      }
-    }
-  }
-
-  fn scan_comment<T: Iterator<Item = char>>(
-    chars: &mut iter::Peekable<T>,
-    next: char,
-  ) -> Option<Token> {
-    match chars.peek() {
-      Some('/') => {
-        chars.next();
-        let mut comment = String::from("");
-        loop {
-          let peek = chars.next();
-          match peek {
-            Some('\n') | None => break,
-            _ => comment.push(peek.unwrap().to_owned()),
-          }
-        }
-        Some(Token::Comment(comment))
-      }
-      _ => Some(Token::Unknown(next)),
-    }
-  }
-
-  fn scan_name<T: Iterator<Item = char>>(
-    chars: &mut iter::Peekable<T>,
-    next: char,
-  ) -> Option<Token> {
-    let mut name = String::from("");
-    let mut current = next;
-    loop {
-      name.push(current);
-      let peek = chars.peek();
-      match peek {
-        Some('a'..='z') | Some('A'..='Z') => {
-          current = peek.unwrap().to_owned();
-          chars.next();
-        }
-        _ => break,
-      }
-    }
-    Some(Token::Name(name))
-  }
-
-  fn scan_number<T: Iterator<Item = char>>(
-    chars: &mut iter::Peekable<T>,
-    next: char,
-  ) -> Option<Token> {
-    let mut number = String::from("");
-    let mut current = next;
-    let mut is_float = false;
-    loop {
-      number.push(current);
-      // TODO: Support numerical seperators (i.e. `_`).
-      // TODO: Support different radix encodings (binary, hex).
-      let peek = chars.peek();
-      match peek {
-        Some('0'..='9') => {
-          current = peek.unwrap().to_owned();
-          chars.next();
-        }
-        Some('.') => {
-          if is_float {
-            break;
-          } else {
-            current = peek.unwrap().to_owned();
-            chars.next();
-            is_float = true;
-          }
-        }
-        _ => break,
-      }
-    }
-    Some(Token::Numeric(number))
-  }
-
-  fn scan_string<T: Iterator<Item = char>>(
-    chars: &mut iter::Peekable<T>,
-  ) -> Option<Token> {
-    let mut literal = String::from("");
-    loop {
-      let peek = chars.next();
-      match peek {
-        Some('\'') => {
-          chars.next();
-          break;
-        }
-        Some('\n') | None => break,
-        _ => {
-          literal.push(peek.unwrap().to_owned());
-        }
-      }
-    }
-    Some(Token::String(literal))
-  }
+  /// A single-line comment block (`// ...`).
+  Comment,
+  /// An invalid or unrecognized block of text.
+  Unknown,
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
 
-  fn assert_tokens(input: &str, tokens: &[Token]) {
-    let mut scanner = Scanner::new(input.to_string());
-    scanner.scan();
-    assert_eq!(tokens.len(), scanner.output.len());
-    for (i, token) in tokens.iter().enumerate() {
-      assert_eq!(token, scanner.output.get(i).unwrap());
-    }
+  fn assert_tokens(input: &str, output: &[Span]) {
+    let result = scan(input.to_owned());
+    assert_eq!(result, output);
   }
 
   #[test]
-  fn test_scan_int_0() {
-    assert_tokens("0", &[Token::Numeric(String::from("0"))]);
+  fn scan_empty() {
+    assert_tokens("", &[]);
   }
 
   #[test]
-  fn test_scan_int_100() {
-    assert_tokens("100", &[Token::Numeric(String::from("100"))]);
-  }
-
-  #[test]
-  fn test_scan_multiple_ints() {
+  fn scan_error() {
     assert_tokens(
-      "10 25 303",
-      &[
-        Token::Numeric(String::from("10")),
-        Token::Numeric(String::from("25")),
-        Token::Numeric(String::from("303")),
-      ],
+      "!",
+      &[Span {
+        offset: 0,
+        contents: "!".to_owned(),
+        kind: Token::Unknown,
+      }],
     );
   }
 
   #[test]
-  fn test_scan_float() {
-    assert_tokens("3.14", &[Token::Numeric(String::from("3.14"))]);
+  fn scan_white_space_only() {
+    assert_tokens(" \n \n\t", &[]);
   }
 
   #[test]
-  fn test_scan_multiple_floats() {
+  fn scan_single_line_comment_terminated_by_eof() {
     assert_tokens(
-      "1.23 2.50 3.03",
-      &[
-        Token::Numeric(String::from("1.23")),
-        Token::Numeric(String::from("2.50")),
-        Token::Numeric(String::from("3.03")),
-      ],
+      "// Hello World",
+      &[Span {
+        contents: "// Hello World".to_owned(),
+        offset: 0,
+        kind: Token::Comment,
+      }],
     );
   }
 
   #[test]
-  fn test_scan_invalid_float() {
+  fn scan_single_line_comment_terminated_by_newline() {
     assert_tokens(
-      "1.2.3",
-      &[
-        Token::Numeric(String::from("1.2")),
-        Token::Unknown('.'),
-        Token::Numeric(String::from("3")),
-      ],
+      "// Hello World\n",
+      &[Span {
+        contents: "// Hello World".to_owned(),
+        offset: 0,
+        kind: Token::Comment,
+      }],
     );
   }
 
   #[test]
-  fn test_scan_name() {
-    assert_tokens("foo", &[Token::Name(String::from("foo"))]);
-  }
-
-  #[test]
-  fn test_scan_multiple_names() {
+  fn scan_multiple_comments() {
     assert_tokens(
-      "foo bar baz",
+      "// 1\n// 2\n// 3",
       &[
-        Token::Name(String::from("foo")),
-        Token::Name(String::from("bar")),
-        Token::Name(String::from("baz")),
-      ],
-    );
-  }
-
-  #[test]
-  fn test_scan_parentheses() {
-    assert_tokens(
-      "foo(bar)",
-      &[
-        Token::Name(String::from("foo")),
-        Token::Pair(PairSymbol::Parentheses, PairType::Open),
-        Token::Name(String::from("bar")),
-        Token::Pair(PairSymbol::Parentheses, PairType::Close),
-      ],
-    );
-  }
-
-  #[test]
-  fn test_scan_curlies() {
-    assert_tokens(
-      "class A {}",
-      &[
-        Token::Name(String::from("class")),
-        Token::Name(String::from("A")),
-        Token::Pair(PairSymbol::CurlyBracket, PairType::Open),
-        Token::Pair(PairSymbol::CurlyBracket, PairType::Close),
-      ],
-    );
-  }
-
-  #[test]
-  fn test_scan_string() {
-    assert_tokens("'foo'", &[Token::String(String::from("foo"))]);
-  }
-
-  #[test]
-  fn test_scan_string_no_terminator() {
-    assert_tokens("'foo", &[Token::String(String::from("foo"))]);
-  }
-
-  #[test]
-  fn test_scan_string_line_terminator() {
-    assert_tokens(
-      "'foo\nbar'",
-      &[
-        Token::String(String::from("foo")),
-        Token::Name(String::from("bar")),
-        Token::String(String::from("")),
-      ],
-    );
-  }
-
-  #[test]
-  fn test_scan_comment() {
-    assert_tokens("// Hello", &[Token::Comment(String::from(" Hello"))])
-  }
-
-  #[test]
-  fn test_scan_comment_line_terminator() {
-    assert_tokens(
-      "// Foo\nbar",
-      &[
-        Token::Comment(String::from(" Foo")),
-        Token::Name(String::from("bar")),
-      ],
-    );
-  }
-
-  #[test]
-  fn test_scan_addition() {
-    assert_tokens(
-      "1 + 2",
-      &[
-        Token::Numeric(String::from("1")),
-        Token::Operator(OperatorSymbol::Addition),
-        Token::Numeric(String::from("2")),
+        Span {
+          contents: "// 1".to_owned(),
+          offset: 0,
+          kind: Token::Comment,
+        },
+        Span {
+          contents: "// 2".to_owned(),
+          offset: 4,
+          kind: Token::Comment,
+        },
+        Span {
+          contents: "// 3".to_owned(),
+          offset: 8,
+          kind: Token::Comment,
+        },
       ],
     )
   }
 
   #[test]
-  fn test_scan_subtraction() {
+  fn scan_error_not_comment() {
     assert_tokens(
-      "1 - 2",
-      &[
-        Token::Numeric(String::from("1")),
-        Token::Operator(OperatorSymbol::Subtraction),
-        Token::Numeric(String::from("2")),
-      ],
-    )
-  }
-
-  #[test]
-  fn test_scan_equality() {
-    assert_tokens(
-      "1 == 2",
-      &[
-        Token::Numeric(String::from("1")),
-        Token::Operator(OperatorSymbol::Equality),
-        Token::Numeric(String::from("2")),
-      ],
-    )
-  }
-
-  #[test]
-  fn test_scan_assignment() {
-    assert_tokens(
-      "let x = 1",
-      &[
-        Token::Name(String::from("let")),
-        Token::Name(String::from("x")),
-        Token::Operator(OperatorSymbol::Assignment),
-        Token::Numeric(String::from("1")),
-      ],
-    )
+      "/",
+      &[Span {
+        offset: 0,
+        contents: "/".to_owned(),
+        kind: Token::Unknown,
+      }],
+    );
   }
 }
