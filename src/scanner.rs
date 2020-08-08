@@ -1,4 +1,6 @@
 /// Handles source code being scanned into lexigraphical symbols (tokens).
+///
+/// Each token includes offset and raw (string) contents for parsing/debugging.
 pub fn scan(input: String) -> Vec<Span> {
   let mut spans = Vec::<Span>::new();
   let mut chars = input.chars().peekable();
