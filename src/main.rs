@@ -35,8 +35,10 @@ fn main() {
 fn run_source(source: String) {
   let mut scanner = scanner::Scanner::new(source);
   scanner.scan();
-  for token in scanner.output {
-    println!("{:?}", token);
+  let mut parser = parser::Parser::new(scanner.output);
+  parser.parse();
+  for ast in parser.output {
+    println!("{:?}", ast);
   }
 }
 

@@ -9,12 +9,14 @@ pub struct Parser {
 }
 
 /// Known top-level declarations.
+#[derive(Debug, PartialEq)]
 pub enum Declaration {
   Comment { text: String },
   Function { name: String, body: Vec<Statement> },
 }
 
 /// Known statements.
+#[derive(Debug, PartialEq)]
 pub enum Statement {
   Comment {
     text: String,
@@ -29,6 +31,7 @@ pub enum Statement {
 }
 
 /// Known expressions.
+#[derive(Debug, PartialEq)]
 pub enum Expression {
   Assignment {
     name: String,
@@ -42,6 +45,7 @@ pub enum Expression {
 }
 
 /// Known binary operators.
+#[derive(Debug, PartialEq)]
 pub enum BinaryOperator {
   Addition,
   Equality,
@@ -63,6 +67,10 @@ impl Parser {
         Token::Comment(comment) => Some(Declaration::Comment {
           text: Parser::parse_comment_contents(comment, &mut tokens),
         }),
+        Token::Name(name) => match name.as_ref() {
+          "func" => Some(Parser::parse_function_declaration(&mut tokens)),
+          _ => panic!("Unexpected"),
+        },
         _ => panic!("Unexpected"),
       };
       if let Some(declaration) = declaration {
@@ -75,11 +83,22 @@ impl Parser {
     initial: &'a str,
     tokens: &mut iter::Peekable<T>,
   ) -> String {
-    String::from("")
+    let mut buffer = String::from(initial);
+    while let Some(Token::Comment(comment)) = tokens.peek() {
+      buffer.push_str("\n");
+      buffer.push_str(comment);
+      tokens.next();
+    }
+    buffer
   }
 
-  fn parse_declaration() -> Option<Declaration> {
-    None
+  fn parse_function_declaration<'a, T: Iterator<Item = &'a Token>>(
+    tokens: &mut iter::Peekable<T>,
+  ) -> Declaration {
+    Declaration::Function {
+      name: String::from(""),
+      body: Vec::new(),
+    }
   }
 
   fn parse_statement() -> Option<Statement> {
@@ -98,15 +117,27 @@ mod tests {
   fn assert_tree(input: Vec<Token>, output: &[Declaration]) {
     let mut parser = Parser::new(input);
     parser.parse();
-    assert_eq!(output.len(), parser.output.len());
+    assert_eq!(parser.output, output);
+  }
+  #[test]
+  fn test_top_level_comment() {
+    assert_tree(
+      vec![Token::Comment(String::from("Hello World"))],
+      &[Declaration::Comment {
+        text: String::from("Hello World"),
+      }],
+    );
   }
 
   #[test]
   fn test_top_level_comments() {
     assert_tree(
-      vec![Token::Comment(String::from("Hello World"))],
+      vec![
+        Token::Comment(String::from("Hello")),
+        Token::Comment(String::from("World")),
+      ],
       &[Declaration::Comment {
-        text: String::from(""),
+        text: String::from("Hello\nWorld"),
       }],
     );
   }
