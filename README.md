@@ -9,9 +9,3 @@ An experimental language written in Rust.
 ```txt
 // Top Level Comment.
 ```
-
-### Functions
-
-```txt
-func name() {}
-```
