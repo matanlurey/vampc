@@ -102,6 +102,7 @@ impl Parser {
   ) -> Declaration {
     if let Some(Token::Identifier(name)) = tokens.peek() {
       tokens.next();
+      Parser::parse_function_parameters(tokens);
       let body = Parser::parse_statement_body(tokens);
       Declaration::Function {
         name: name.to_string(),
@@ -109,6 +110,24 @@ impl Parser {
       }
     } else {
       panic!("Expected Identifier");
+    }
+  }
+
+  // TODO: Actual return parameters instead of nothing.
+  fn parse_function_parameters<'a, T: Iterator<Item = &'a Token>>(
+    tokens: &mut iter::Peekable<T>,
+  ) {
+    match tokens.peek() {
+      Some(Token::Pair(PairSymbol::Parentheses, PairType::Open)) => {
+        tokens.next();
+      }
+      _ => panic!("Expected ("),
+    }
+    match tokens.peek() {
+      Some(Token::Pair(PairSymbol::Parentheses, PairType::Close)) => {
+        tokens.next();
+      }
+      _ => panic!("Expected )"),
     }
   }
 
@@ -198,6 +217,8 @@ mod tests {
       vec![
         Token::Keyword(Keyword::Func),
         Token::Identifier(String::from("main")),
+        Token::Pair(PairSymbol::Parentheses, PairType::Open),
+        Token::Pair(PairSymbol::Parentheses, PairType::Close),
         Token::Pair(PairSymbol::CurlyBracket, PairType::Open),
         Token::Pair(PairSymbol::CurlyBracket, PairType::Close),
       ],
