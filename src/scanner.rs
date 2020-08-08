@@ -22,15 +22,14 @@ pub fn scan(input: String) -> Vec<Span> {
         }
       }
       // Whitespace.
+      // Do nothing (skip this token as its not significant).
       ' ' | '\n' | '\t' => {
-        // Do nothing (skip this token as its not significant).
         offset += 1;
         continue;
       }
       // Unknown.
-      _ => {
-        // Do nothing (add an unknown token to output).
-      }
+      // Do nothing (will add an unknown token to output).
+      _ => {}
     }
     spans.push(Span {
       offset,
@@ -139,5 +138,17 @@ mod tests {
         },
       ],
     )
+  }
+
+  #[test]
+  fn scan_error_not_comment() {
+    assert_tokens(
+      "/",
+      &[Span {
+        offset: 0,
+        contents: "/".to_owned(),
+        kind: Token::Unknown,
+      }],
+    );
   }
 }
