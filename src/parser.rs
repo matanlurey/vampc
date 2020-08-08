@@ -71,8 +71,8 @@ impl Parser {
     }
   }
 
-  fn parse_comment_contents<T: Iterator<Item = Token>>(
-    initial: &str,
+  fn parse_comment_contents<'a, T: Iterator<Item = &'a Token>>(
+    initial: &'a str,
     tokens: &mut iter::Peekable<T>,
   ) -> String {
     String::from("")
@@ -103,6 +103,11 @@ mod tests {
 
   #[test]
   fn test_top_level_comments() {
-    assert_tree(vec![Token::Comment(String::from("Hello World"))], &[]);
+    assert_tree(
+      vec![Token::Comment(String::from("Hello World"))],
+      &[Declaration::Comment {
+        text: String::from(""),
+      }],
+    );
   }
 }
