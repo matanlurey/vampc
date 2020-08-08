@@ -1,4 +1,6 @@
 use scanner::Keyword;
+use scanner::PairSymbol;
+use scanner::PairType;
 use scanner::Token;
 use std::iter;
 
@@ -53,7 +55,6 @@ pub enum BinaryOperator {
   Subtraction,
 }
 
-// TODO: Add helper methods to make parsing tolerable.
 impl Parser {
   pub fn new(input: Vec<Token>) -> Parser {
     Parser {
@@ -73,9 +74,9 @@ impl Parser {
           Keyword::Func => {
             Some(Parser::parse_function_declaration(&mut tokens))
           }
-          _ => panic!("Unexpected"),
+          _ => panic!("Unexpected keyword @ top level: {:?}", next),
         },
-        _ => panic!("Unexpected"),
+        _ => panic!("Unexpected token @ top level: {:?}", next),
       };
       if let Some(declaration) = declaration {
         self.output.push(declaration);
@@ -100,28 +101,61 @@ impl Parser {
     tokens: &mut iter::Peekable<T>,
   ) -> Declaration {
     if let Some(Token::Identifier(name)) = tokens.peek() {
-      let mut statements = Vec::<Statement>::new();
-      while let Some(s) = Parser::parse_statement() {
-        statements.push(s);
-      }
+      tokens.next();
+      let body = Parser::parse_statement_body(tokens);
       Declaration::Function {
         name: name.to_string(),
-        body: statements,
+        body,
       }
     } else {
       panic!("Expected Identifier");
     }
   }
 
-  fn parse_statement() -> Option<Statement> {
-    if let Some(expression) = Parser::parse_expression() {
+  fn parse_statement_body<'a, T: Iterator<Item = &'a Token>>(
+    tokens: &mut iter::Peekable<T>,
+  ) -> Vec<Statement> {
+    let mut statements = Vec::<Statement>::new();
+    match tokens.peek() {
+      Some(Token::Pair(PairSymbol::CurlyBracket, PairType::Open)) => {
+        tokens.next();
+      }
+      _ => panic!("Expected {"),
+    }
+    loop {
+      match tokens.peek() {
+        Some(Token::Pair(PairSymbol::CurlyBracket, PairType::Close)) => {
+          tokens.next();
+          break;
+        }
+        None => {
+          panic!("Expected }");
+        }
+        _ => {
+          if let Some(statement) = Parser::parse_statement(tokens) {
+            statements.push(statement);
+          } else {
+            break;
+          }
+        }
+      }
+    }
+    statements
+  }
+
+  fn parse_statement<'a, T: Iterator<Item = &'a Token>>(
+    tokens: &mut iter::Peekable<T>,
+  ) -> Option<Statement> {
+    if let Some(expression) = Parser::parse_expression(tokens) {
       Some(Statement::Expression { expression })
     } else {
       None
     }
   }
 
-  fn parse_expression() -> Option<Expression> {
+  fn parse_expression<'a, T: Iterator<Item = &'a Token>>(
+    _tokens: &mut iter::Peekable<T>,
+  ) -> Option<Expression> {
     None
   }
 }
@@ -159,5 +193,18 @@ mod tests {
   }
 
   #[test]
-  fn test_function_declaration() {}
+  fn test_function_declaration() {
+    assert_tree(
+      vec![
+        Token::Keyword(Keyword::Func),
+        Token::Identifier(String::from("main")),
+        Token::Pair(PairSymbol::CurlyBracket, PairType::Open),
+        Token::Pair(PairSymbol::CurlyBracket, PairType::Close),
+      ],
+      &[Declaration::Function {
+        name: String::from("main"),
+        body: Vec::new(),
+      }],
+    );
+  }
 }
