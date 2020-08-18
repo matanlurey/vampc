@@ -9,6 +9,18 @@ pub fn scan(input: String) -> Vec<Span> {
     let mut contents: String = next.to_string();
     let mut kind = Token::Unknown;
     match next {
+      // Identifier or Keyword.
+      'a'..='z' | 'A'..='Z' => {
+        let mut contents = next.to_string();
+        while let Some('a'..='z') | Some('A'..='Z') = chars.peek() {
+          contents.push(chars.next().unwrap());
+        }
+        match contents.as_str() {
+          "func" => kind = Token::Keyword(Keyword::Func),
+          "let" => kind = Token::Keyword(Keyword::Let),
+          _ => kind = Token::Identifier(contents),
+        }
+      }
       // Possible comment.
       '/' => {
         if let Some('/') = chars.peek() {
@@ -61,6 +73,16 @@ pub enum Token {
   Comment,
   /// An invalid or unrecognized block of text.
   Unknown,
+  /// An identifier.
+  Identifier(String),
+  /// A keyword.
+  Keyword(Keyword),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Keyword {
+  Func,
+  Let,
 }
 
 #[cfg(test)]
