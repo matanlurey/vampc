@@ -9,6 +9,17 @@ pub fn scan(input: String) -> Vec<Span> {
     let mut contents: String = next.to_string();
     let mut kind = Token::Unknown;
     match next {
+      // Identifier or Keyword.
+      'a'..='z' | 'A'..='Z' => {
+        while let Some('a'..='z') | Some('A'..='Z') = chars.peek() {
+          contents.push(chars.next().unwrap());
+        }
+        match contents.as_str() {
+          "func" => kind = Token::Keyword(Keyword::Func),
+          "let" => kind = Token::Keyword(Keyword::Let),
+          _ => kind = Token::Identifier(contents.to_owned()),
+        }
+      }
       // Possible comment.
       '/' => {
         if let Some('/') = chars.peek() {
@@ -61,6 +72,16 @@ pub enum Token {
   Comment,
   /// An invalid or unrecognized block of text.
   Unknown,
+  /// An identifier.
+  Identifier(String),
+  /// A keyword.
+  Keyword(Keyword),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Keyword {
+  Func,
+  Let,
 }
 
 #[cfg(test)]
@@ -152,5 +173,43 @@ mod tests {
         kind: Token::Unknown,
       }],
     );
+  }
+
+  #[test]
+  fn scan_keyword_func() {
+    assert_tokens(
+      "func main",
+      &[
+        Span {
+          offset: 0,
+          contents: "func".to_owned(),
+          kind: Token::Keyword(Keyword::Func),
+        },
+        Span {
+          offset: 5,
+          contents: "main".to_owned(),
+          kind: Token::Identifier(String::from("main")),
+        },
+      ],
+    )
+  }
+
+  #[test]
+  fn scan_keyword_let() {
+    assert_tokens(
+      "let foo",
+      &[
+        Span {
+          offset: 0,
+          contents: "let".to_owned(),
+          kind: Token::Keyword(Keyword::Let),
+        },
+        Span {
+          offset: 4,
+          contents: "foo".to_owned(),
+          kind: Token::Identifier(String::from("foo")),
+        },
+      ],
+    )
   }
 }
