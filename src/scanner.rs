@@ -11,14 +11,13 @@ pub fn scan(input: String) -> Vec<Span> {
     match next {
       // Identifier or Keyword.
       'a'..='z' | 'A'..='Z' => {
-        let mut contents = next.to_string();
         while let Some('a'..='z') | Some('A'..='Z') = chars.peek() {
           contents.push(chars.next().unwrap());
         }
         match contents.as_str() {
           "func" => kind = Token::Keyword(Keyword::Func),
           "let" => kind = Token::Keyword(Keyword::Let),
-          _ => kind = Token::Identifier(contents),
+          _ => kind = Token::Identifier(contents.to_owned()),
         }
       }
       // Possible comment.
@@ -174,5 +173,43 @@ mod tests {
         kind: Token::Unknown,
       }],
     );
+  }
+
+  #[test]
+  fn scan_keyword_func() {
+    assert_tokens(
+      "func main",
+      &[
+        Span {
+          offset: 0,
+          contents: "func".to_owned(),
+          kind: Token::Keyword(Keyword::Func),
+        },
+        Span {
+          offset: 5,
+          contents: "main".to_owned(),
+          kind: Token::Identifier(String::from("main")),
+        },
+      ],
+    )
+  }
+
+  #[test]
+  fn scan_keyword_let() {
+    assert_tokens(
+      "let foo",
+      &[
+        Span {
+          offset: 0,
+          contents: "let".to_owned(),
+          kind: Token::Keyword(Keyword::Let),
+        },
+        Span {
+          offset: 4,
+          contents: "foo".to_owned(),
+          kind: Token::Identifier(String::from("foo")),
+        },
+      ],
+    )
   }
 }
